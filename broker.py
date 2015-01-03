@@ -34,20 +34,19 @@ class brokerHandler:
 			if 'REGISTRY-' in data :
 				self.onlineDevices.update(json.loads(data.split('REGISTRY-')[1]))
 				broUdpSock.sendto('200',address)
-			print '\n'
 			for key,value in self.onlineDevices.iteritems() :
 				print key,value
 			print '\n'
 			if 'LOCATE-' in data :
-				key = data.split('LOCATE-')[1]
+				to = data.split('LOCATE-')[1]
+				init = data.split('LOCATE-')[2]
 				access_code = md5(str(random.randrange(0,10000000)))
 				try :
-					location = self.onlineDevices[key]
+					location = self.onlineDevices[to]
 				except KeyError :
 					location = 'OFFLINE'
-				reply = { 'for' : key , 'location' : location , 'access_code' : access_code}
-				print reply
-				broUdpSock.sendto('REQ-AUTH-'+json.dumps(reply),(reply['location'],NODE_UDP_PORT))				
+				reply = { 'init' : init , 'to' : to , 'location' : location , 'access_code' : access_code}
+				broUdpSock.sendto('ADV-AUTH-'+json.dumps(reply),(reply['location'],NODE_UDP_PORT))				
 				broUdpSock.sendto(json.dumps(reply),address)
 				
 				
