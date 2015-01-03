@@ -1,0 +1,117 @@
+
+
+import socket
+import threading 
+import time
+
+BROADCAST_PORT = 6000
+STATUS_PORT = 6001
+CALL_PORT = 6002
+SELF_P_NUM = '9660570748'
+MAX = 50000
+
+class app :
+	def __init__(self,phoneNum) :
+		self.phoneNumber = phoneNum
+		self.isFree = True
+		thread = threading.Thread( target = self.callReciever , args = ())
+		#thread.start()
+		thread = threading.Thread( target = self.statusInformer , args = ())
+		#thread.start()
+		thread = threading.Thread( target = self.genTest , args = ())
+		#thread.start()
+
+	def genTest(self) :
+		while True :
+			print self.isFree
+			time.sleep(0.5)
+
+	def statusInformer(self) :
+		s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+		s.bind(('',STATUS_PORT))
+		data , address = s.recvfrom(MAX)
+		if self.isFree :
+			s.sendto('FREE',(address))
+		else :
+			s.sendto('BUSY',(address))
+
+	def callReciever(self) :
+		s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+		s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+		s.bind(('',CALL_PORT))
+		s.listen(1)
+		c , address = s.accept()
+		c.send("HELLO")
+
+	def addr5(self,ip,start,end,phoneNum) :
+		s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM) 
+		s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+		for i in range(start,end) :
+			try :
+				s.sendto(str(phoneNum),(ip+'.'+str(i),BROADCAST_PORT))
+			except socket.error as error :
+				pass
+
+	def addr4(self,ip,phoneNum) :
+		for i in range(0,8) :
+			thread = threading.Thread( target = self.addr5, args = (ip,i*32,(i+1)*32,phoneNum))
+			thread.start()
+			thread.join()
+
+	def addr3(self,phoneNum) :
+		for i in range(0,50) :
+			thread = threading.Thread( target = self.addr4, args = ('172.17.'+str(i),phoneNum))
+			thread.start()
+			thread.join()
+
+	def locate(self,phoneNum) :
+		s = socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		s.bind(('',BROADCAST_PORT))
+		s.settimeout(2)
+		thread = threading.Thread(target = self.addr3 , args = (phoneNum,))
+		thread.start()
+		thread.join()
+		try :
+			data , address = s.recvfrom(MAX)
+			if data == self.phoneNumber :
+				location = address[0]
+			else :
+				location = 'NULL'
+		except socket.error as error :
+			location = 'NULL'
+		return location
+
+	def checkStatus(self,location) :
+		s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM)
+		s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+		s.sendto('STATUS',(location,STATUS_PORT))
+		data , address = s.recvfrom(MAX)
+		if data == 'FREE' :
+			return True
+		else :
+			return False
+
+	def call(self,phoneNum) :
+		location = self.locate(phoneNum)
+		if location == 'NULL' :
+			print  'Number not found'
+		else :
+			if self.checkStatus(location) :
+				self.isFree = False
+				print 'Connecting...'
+				s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+				s.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+				s.connect((location,CALL_PORT))
+				s.recv(MAX)
+				temp = raw_input()
+				self.isFree = True
+			else :
+				print 'Number Busy'
+
+
+
+dialer = app(SELF_P_NUM)
+dialer.call('9660570748')
+
+
